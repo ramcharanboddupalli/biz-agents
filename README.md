@@ -1,8 +1,8 @@
 # BizAgents – Multi-Agent Business Automation
 
-> **Current status: INTAKE AGENT PHASE.** The text-based Intake Agent is
-> implemented. Other agents and product functionality have not been
-> implemented.
+> **Current status: RAG MEMORY PHASE.** The text-based Intake Agent and local,
+> persistent ChromaDB business memory are implemented. Other agents and
+> product functionality have not been implemented.
 
 ## What BizAgents is
 
@@ -71,13 +71,15 @@ phase begins.
 ```text
 bizagents/
 ├── agents/          # Text-based Intake Agent
-├── rag/             # Planned retrieval components; currently empty
+├── rag/             # Persistent ChromaDB business profile memory
 ├── voice/           # Planned speech components; currently empty
 ├── api/             # Planned backend API; currently empty
 ├── frontend/        # Planned frontend; currently empty
 ├── evals/           # Planned evaluation and monitoring; currently empty
+├── tests/           # Intake Agent and RAG memory tests
+├── data/chroma/     # Local ChromaDB storage (ignored by Git)
 ├── .env.example     # Placeholder names for future service configuration
-├── requirements.txt # Minimal Python foundation dependencies
+├── requirements.txt # Python foundation and ChromaDB dependency
 └── README.md
 ```
 
@@ -86,9 +88,34 @@ bizagents/
 **Phase 1 — Project Foundation:** establish the repository structure, minimal
 Python dependencies, environment-variable template, and project documentation.
 
-**Phase 2 — Intake Agent (current):** collect and confirm a business owner's
-offering, target customers, location, budget, and goals through a text
-conversation. Other agents and product functionality remain unimplemented.
+**Phase 2 — Intake Agent:** collect and confirm a business owner's offering,
+target customers, location, budget, and goals through a text conversation.
+
+**Phase 3 — RAG Memory (current):** persist confirmed business profiles in
+ChromaDB and retrieve relevant profile fields semantically. Local persistent
+storage is used at `data/chroma/`; generated vector database files are ignored
+by Git. Future agents will consume this reusable memory interface. The
+Research, Analysis, Report, and Manager agents are not implemented. Queries
+without a sufficiently relevant semantic match return no results.
+
+```python
+from rag import BusinessMemory, BusinessProfile
+
+# Pass the completed, owner-confirmed IntakeSession.
+profile = BusinessProfile.from_intake_session(
+    completed_session,
+    business_profile_id="development-business",
+)
+memory = BusinessMemory()  # Persists locally in data/chroma/
+try:
+    memory.save_business_profile(profile)
+    matches = memory.retrieve(
+        "Who are the target customers?",
+        business_profile_id=profile.business_profile_id,
+    )
+finally:
+    memory.close()
+```
 
 The uploaded **BizAgents Complete Project Plan** is the authoritative Master
 Plan. Development must follow its defined architecture and sequence:
@@ -126,7 +153,10 @@ Future implementation must not silently change this architecture or sequence.
 
 ## Foundation dependencies
 
-The initial `requirements.txt` includes only FastAPI, its ASGI server, and
-settings/environment support. Agent frameworks, LLM clients, database drivers,
-RAG, voice, search, company-data, email, and observability packages are
-deferred until their planned implementation phases.
+`requirements.txt` includes FastAPI, its ASGI server, settings/environment
+support, and ChromaDB for the implemented local RAG memory layer. Agent
+frameworks, LLM clients, database drivers, voice, search, company-data, email,
+and observability packages are deferred until their planned implementation
+phases. ChromaDB's built-in ONNX-backed `all-MiniLM-L6-v2` embedding function
+runs locally after its model files are downloaded on first use; it does not
+require a paid embedding API or API key.

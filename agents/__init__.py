@@ -9,8 +9,25 @@ from .intake import (
     IntakeState,
     IntakeTurn,
 )
+from .research import (
+    BusinessFinding,
+    CompetitorResearch,
+    LeadResearch,
+    MarketResearch,
+    ProviderResult,
+    ResearchAgent,
+    ResearchCategory,
+    ResearchIssue,
+    ResearchProvider,
+    ResearchQuery,
+    ResearchResult,
+    ResearchSource,
+    ResearchStatus,
+)
 
 __all__ = [
+    "BusinessFinding",
+    "CompetitorResearch",
     "ConfirmationStatus",
     "IntakeAgent",
     "IntakeData",
@@ -18,4 +35,15 @@ __all__ = [
     "IntakeSession",
     "IntakeState",
     "IntakeTurn",
+    "LeadResearch",
+    "MarketResearch",
+    "ProviderResult",
+    "ResearchAgent",
+    "ResearchCategory",
+    "ResearchIssue",
+    "ResearchProvider",
+    "ResearchQuery",
+    "ResearchResult",
+    "ResearchSource",
+    "ResearchStatus",
 ]

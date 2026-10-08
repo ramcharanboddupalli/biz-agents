@@ -1,8 +1,9 @@
 # BizAgents – Multi-Agent Business Automation
 
-> **Current status: RAG MEMORY PHASE.** The text-based Intake Agent and local,
-> persistent ChromaDB business memory are implemented. Other agents and
-> product functionality have not been implemented.
+> **Current status: RESEARCH AGENT PHASE.** The text-based Intake Agent,
+> persistent ChromaDB business memory, and source-aware Research Agent are
+> implemented. Other agents and product functionality have not been
+> implemented.
 
 ## What BizAgents is
 
@@ -70,13 +71,13 @@ phase begins.
 
 ```text
 bizagents/
-├── agents/          # Text-based Intake Agent
+├── agents/          # Text-based Intake and provider-driven Research Agents
 ├── rag/             # Persistent ChromaDB business profile memory
 ├── voice/           # Planned speech components; currently empty
 ├── api/             # Planned backend API; currently empty
 ├── frontend/        # Planned frontend; currently empty
 ├── evals/           # Planned evaluation and monitoring; currently empty
-├── tests/           # Intake Agent and RAG memory tests
+├── tests/           # Intake Agent, RAG memory, and Research Agent tests
 ├── data/chroma/     # Local ChromaDB storage (ignored by Git)
 ├── .env.example     # Placeholder names for future service configuration
 ├── requirements.txt # Python foundation and ChromaDB dependency
@@ -91,12 +92,12 @@ Python dependencies, environment-variable template, and project documentation.
 **Phase 2 — Intake Agent:** collect and confirm a business owner's offering,
 target customers, location, budget, and goals through a text conversation.
 
-**Phase 3 — RAG Memory (current):** persist confirmed business profiles in
+**Phase 3 — RAG Memory:** persist confirmed business profiles in
 ChromaDB and retrieve relevant profile fields semantically. Local persistent
 storage is used at `data/chroma/`; generated vector database files are ignored
 by Git. Future agents will consume this reusable memory interface. The
-Research, Analysis, Report, and Manager agents are not implemented. Queries
-without a sufficiently relevant semantic match return no results.
+Analysis, Report, and Manager agents are not implemented. Queries without a
+sufficiently relevant semantic match return no results.
 
 ```python
 from rag import BusinessMemory, BusinessProfile
@@ -117,13 +118,22 @@ finally:
     memory.close()
 ```
 
+**Phase 4 — Research Agent (current):** accept a validated `BusinessProfile`,
+derive deterministic business, market, competitor, and lead research queries,
+and execute them through an injected `ResearchProvider` protocol. Results are
+structured and source-aware: findings reference normalized source records,
+and missing or unusable source URLs are reported rather than fabricated.
+Provider failures and malformed results are represented in the result status
+and issues. Unit tests use a deterministic fake provider and make no network
+calls. No vendor search or company-data integrations are implemented.
+
 The uploaded **BizAgents Complete Project Plan** is the authoritative Master
 Plan. Development must follow its defined architecture and sequence:
 
 1. Project Foundation
 2. Intake Agent
 3. RAG Memory
-4. Research Agent
+4. Research Agent (implemented)
 5. Analysis Agent
 6. Report Agent
 7. Manager Agent

@@ -1,9 +1,9 @@
 # BizAgents – Multi-Agent Business Automation
 
-> **Current status: ANALYSIS AGENT PHASE.** The text-based Intake Agent,
+> **Current status: REPORT AGENT PHASE.** The text-based Intake Agent,
 > persistent ChromaDB business memory, source-aware Research Agent, and
-> deterministic Analysis Agent are implemented. Other agents and product
-> functionality have not been implemented.
+> deterministic Analysis and Report Agents are implemented. Later agents and
+> product functionality have not been implemented.
 
 ## What BizAgents is
 
@@ -44,8 +44,9 @@ The plan names the following agents and their intended responsibilities:
 3. Prepare relevant outreach and follow-up material.
 4. Present the results in a report.
 
-This is a high-level description only. The Intake, Research, and Analysis
-Agents are implemented; other planned agent workflows are not yet implemented.
+This is a high-level description only. The Intake, Research, Analysis, and
+Report Agents are implemented; other planned agent workflows are not yet
+implemented.
 
 ## Planned technology stack
 
@@ -71,13 +72,13 @@ phase begins.
 
 ```text
 bizagents/
-├── agents/          # Intake, Research, and deterministic Analysis Agents
+├── agents/          # Intake, Research, Analysis, and Report Agents
 ├── rag/             # Persistent ChromaDB business profile memory
 ├── voice/           # Planned speech components; currently empty
 ├── api/             # Planned backend API; currently empty
 ├── frontend/        # Planned frontend; currently empty
 ├── evals/           # Planned evaluation and monitoring; currently empty
-├── tests/           # Intake, RAG memory, Research, and Analysis Agent tests
+├── tests/           # Intake, RAG memory, Research, Analysis, and Report tests
 ├── data/chroma/     # Local ChromaDB storage (ignored by Git)
 ├── .env.example     # Placeholder names for future service configuration
 ├── requirements.txt # Python foundation and ChromaDB dependency
@@ -96,7 +97,7 @@ target customers, location, budget, and goals through a text conversation.
 ChromaDB and retrieve relevant profile fields semantically. Local persistent
 storage is used at `data/chroma/`; generated vector database files are ignored
 by Git. Future agents will consume this reusable memory interface. The
-Report and Manager agents are not implemented. Queries without a
+Manager agent is not implemented. Queries without a
 sufficiently relevant semantic match return no results.
 
 ```python
@@ -147,6 +148,14 @@ lead name, original lead name, and valid source IDs. Scores measure textual
 evidence alignment only. A lead is not treated as business-fit evidence, or
 used to generate a lead opportunity/recommendation, unless both offering and
 target-customer dimensions are corroborated.
+
+**Phase 6 — Report Agent (implemented):** combine supplied research and
+analysis results into an immutable structured business report and deterministic
+Markdown rendering. Existing finding and analysis models are reused, source
+citations are restricted to valid references from the supplied research, and
+missing data, warnings, and research limitations are shown explicitly.
+Recommendations remain advisory; no actions are executed and budget fit is not
+assumed. The Report Agent uses no external services or additional dependencies.
 
 The uploaded **BizAgents Complete Project Plan** is the authoritative Master
 Plan. Development must follow its defined architecture and sequence:

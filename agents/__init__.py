@@ -35,6 +35,7 @@ from .research import (
     ResearchSource,
     ResearchStatus,
 )
+from .report import BusinessReport, ReportAgent, ReportSourceReference, render_report
 
 __all__ = [
     "AnalysisAgent",
@@ -42,6 +43,7 @@ __all__ = [
     "AnalysisStatus",
     "BusinessFinding",
     "BusinessOpportunity",
+    "BusinessReport",
     "CompetitorResearch",
     "ConfirmationStatus",
     "IntakeAgent",
@@ -58,6 +60,8 @@ __all__ = [
     "MarketSignal",
     "ProviderResult",
     "Recommendation",
+    "ReportAgent",
+    "ReportSourceReference",
     "ResearchAgent",
     "ResearchCategory",
     "ResearchIssue",
@@ -66,4 +70,5 @@ __all__ = [
     "ResearchResult",
     "ResearchSource",
     "ResearchStatus",
+    "render_report",
 ]

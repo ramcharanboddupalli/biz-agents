@@ -1,9 +1,9 @@
 # BizAgents – Multi-Agent Business Automation
 
-> **Current status: RESEARCH AGENT PHASE.** The text-based Intake Agent,
-> persistent ChromaDB business memory, and source-aware Research Agent are
-> implemented. Other agents and product functionality have not been
-> implemented.
+> **Current status: ANALYSIS AGENT PHASE.** The text-based Intake Agent,
+> persistent ChromaDB business memory, source-aware Research Agent, and
+> deterministic Analysis Agent are implemented. Other agents and product
+> functionality have not been implemented.
 
 ## What BizAgents is
 
@@ -44,8 +44,8 @@ The plan names the following agents and their intended responsibilities:
 3. Prepare relevant outreach and follow-up material.
 4. Present the results in a report.
 
-This is a high-level description only. The text-based Intake Agent is
-implemented; the other planned agent workflows are not yet implemented.
+This is a high-level description only. The Intake, Research, and Analysis
+Agents are implemented; other planned agent workflows are not yet implemented.
 
 ## Planned technology stack
 
@@ -71,13 +71,13 @@ phase begins.
 
 ```text
 bizagents/
-├── agents/          # Text-based Intake and provider-driven Research Agents
+├── agents/          # Intake, Research, and deterministic Analysis Agents
 ├── rag/             # Persistent ChromaDB business profile memory
 ├── voice/           # Planned speech components; currently empty
 ├── api/             # Planned backend API; currently empty
 ├── frontend/        # Planned frontend; currently empty
 ├── evals/           # Planned evaluation and monitoring; currently empty
-├── tests/           # Intake Agent, RAG memory, and Research Agent tests
+├── tests/           # Intake, RAG memory, Research, and Analysis Agent tests
 ├── data/chroma/     # Local ChromaDB storage (ignored by Git)
 ├── .env.example     # Placeholder names for future service configuration
 ├── requirements.txt # Python foundation and ChromaDB dependency
@@ -96,7 +96,7 @@ target customers, location, budget, and goals through a text conversation.
 ChromaDB and retrieve relevant profile fields semantically. Local persistent
 storage is used at `data/chroma/`; generated vector database files are ignored
 by Git. Future agents will consume this reusable memory interface. The
-Analysis, Report, and Manager agents are not implemented. Queries without a
+Report and Manager agents are not implemented. Queries without a
 sufficiently relevant semantic match return no results.
 
 ```python
@@ -118,7 +118,7 @@ finally:
     memory.close()
 ```
 
-**Phase 4 — Research Agent (current):** accept a validated `BusinessProfile`,
+**Phase 4 — Research Agent (implemented):** accept a validated `BusinessProfile`,
 derive deterministic business, market, competitor, and lead research queries,
 and execute them through an injected `ResearchProvider` protocol. Results are
 structured and source-aware: findings reference normalized source records,
@@ -126,6 +126,27 @@ and missing or unusable source URLs are reported rather than fabricated.
 Provider failures and malformed results are represented in the result status
 and issues. Unit tests use a deterministic fake provider and make no network
 calls. No vendor search or company-data integrations are implemented.
+
+**Phase 5 — Analysis Agent (implemented):** consume the structured
+`ResearchResult` and produce deterministic lead rankings, source-backed market
+signals and qualified potential gaps, opportunities, and advisory
+recommendations. Lead scores are a documented 0–100 profile-match heuristic,
+not conversion probabilities. Source IDs and URLs are validated against the
+supplied research; missing or weak evidence is surfaced as warnings, and the
+agent does not infer market demand from the profile or a lead's existence.
+Budget fit is never assumed: recommendations require the user to verify costs
+against the available budget. Tests use local deterministic fixtures only.
+
+Lead scores add independently corroborated profile-dimension matches:
+**offering +30, target customers +30, business location +20, and business
+goal +20**. A dimension earns points only when its complete normalized profile
+phrase appears in both the lead description/relevance and a linked, valid
+research-source snippet. Missing or unmatched dimensions contribute zero; the
+sum is clamped to 0–100. Rankings sort by descending score, then case-folded
+lead name, original lead name, and valid source IDs. Scores measure textual
+evidence alignment only. A lead is not treated as business-fit evidence, or
+used to generate a lead opportunity/recommendation, unless both offering and
+target-customer dimensions are corroborated.
 
 The uploaded **BizAgents Complete Project Plan** is the authoritative Master
 Plan. Development must follow its defined architecture and sequence:

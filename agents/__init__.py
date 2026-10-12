@@ -9,6 +9,17 @@ from .intake import (
     IntakeState,
     IntakeTurn,
 )
+from .analysis import (
+    AnalysisAgent,
+    AnalysisResult,
+    AnalysisStatus,
+    BusinessOpportunity,
+    LeadScore,
+    MarketGap,
+    MarketEvidenceStatus,
+    MarketSignal,
+    Recommendation,
+)
 from .research import (
     BusinessFinding,
     CompetitorResearch,
@@ -26,7 +37,11 @@ from .research import (
 )
 
 __all__ = [
+    "AnalysisAgent",
+    "AnalysisResult",
+    "AnalysisStatus",
     "BusinessFinding",
+    "BusinessOpportunity",
     "CompetitorResearch",
     "ConfirmationStatus",
     "IntakeAgent",
@@ -36,8 +51,13 @@ __all__ = [
     "IntakeState",
     "IntakeTurn",
     "LeadResearch",
+    "LeadScore",
+    "MarketEvidenceStatus",
+    "MarketGap",
     "MarketResearch",
+    "MarketSignal",
     "ProviderResult",
+    "Recommendation",
     "ResearchAgent",
     "ResearchCategory",
     "ResearchIssue",

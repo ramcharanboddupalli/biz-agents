@@ -1,10 +1,10 @@
 # BizAgents – Multi-Agent Business Automation
 
-> **Current status: ARIZE TRACING PHASE.** The text-based Intake Agent,
+> **Current status: ARIZE EVALUATIONS PHASE.** The text-based Intake Agent,
 > persistent ChromaDB business memory, source-aware Research Agent, and
-> deterministic Analysis, Report, and Manager Agents are implemented. Manager
-> workflow tracing is implemented; later phases and product functionality are
-> not yet implemented.
+> deterministic Analysis, Report, and Manager Agents are implemented.
+> Manager workflow tracing and deterministic workflow evaluations are
+> implemented; later phases and product functionality are not yet implemented.
 
 ## What BizAgents is
 
@@ -78,8 +78,8 @@ bizagents/
 ├── voice/           # Planned speech components; currently empty
 ├── api/             # Planned backend API; currently empty
 ├── frontend/        # Planned frontend; currently empty
-├── evals/           # Planned evaluation and monitoring; currently empty
-├── tests/           # Agent, RAG memory, Manager, and tracing tests
+├── evals/           # Deterministic workflow evaluators and optional Phoenix export
+├── tests/           # Agent, RAG memory, Manager, tracing, and evaluation tests
 ├── data/chroma/     # Local ChromaDB storage (ignored by Git)
 ├── .env.example     # Placeholder names for future service configuration
 ├── requirements.txt # Python foundation, ChromaDB, and Phoenix tracing
@@ -185,6 +185,28 @@ files. Never commit real credentials. Set `BIZAGENTS_TRACING_ENABLED=false` to
 disable tracing. Phoenix automatic instrumentation is intentionally off to
 avoid capturing unrelated or sensitive data.
 
+**Phase 9 — Arize Evaluations (implemented):** `evals.evaluate_workflow`
+performs deterministic local checks of Manager stage/status consistency,
+report citation integrity, structured report-claim source links, and analysis
+recommendation source links. Results have stable evaluator IDs, a pass/fail/
+insufficient-data label, a numeric score where evidence is sufficient, and a
+concise explanation. These checks validate structural source linkage; they do
+not claim to semantically prove that a source supports a statement, and they
+do not use an LLM judge. Missing usable evidence is reported as
+`insufficient_data`, never as a pass.
+
+Local evaluation requires no Phoenix account, credentials, network access, or
+additional dependency. To explicitly attach results to an existing Phoenix
+workflow span, install the optional Phoenix client with
+`pip install "arize-phoenix-client>=3.5.0,<4"` and call
+`evals.export_evaluations_to_phoenix(client, span_id=..., results=...)` after
+the Manager returns. The exporter creates `CODE` span annotations and sends
+only the evaluator ID, label, and score; it does not export business content
+or explanations. It is not called by `ManagerAgent.run()`, and export errors
+are raised to the caller without changing the already-produced workflow
+result. Phoenix client configuration and credentials are managed by the
+caller; do not put secrets in source control.
+
 The uploaded **BizAgents Complete Project Plan** is the authoritative Master
 Plan. Development must follow its defined architecture and sequence:
 
@@ -196,7 +218,7 @@ Plan. Development must follow its defined architecture and sequence:
 6. Report Agent (implemented)
 7. Manager Agent (implemented)
 8. Arize Tracing (implemented)
-9. Arize Evaluations
+9. Arize Evaluations (implemented)
 10. Frontend
 11. Voice and multilingual support
 12. Outreach Agent with human approval
@@ -223,9 +245,11 @@ Future implementation must not silently change this architecture or sequence.
 
 `requirements.txt` includes FastAPI, its ASGI server, settings/environment
 support, ChromaDB for the implemented local RAG memory layer, and
-`arize-phoenix-otel` for optional Phase 8 tracing. Agent frameworks, LLM
-clients, database drivers, voice, search, company-data, email, and evaluation
-packages remain deferred until their planned implementation phases.
+`arize-phoenix-otel` for optional Phase 8 tracing. Phase 9 local evaluators
+have no added dependencies; the Phoenix client is an optional install for
+explicit annotation export. Agent frameworks, LLM clients, database drivers,
+voice, search, company-data, and email packages remain deferred until their
+planned implementation phases.
 ChromaDB's built-in ONNX-backed `all-MiniLM-L6-v2` embedding function runs
 locally after its model files are downloaded on first use; it does not require
 a paid embedding API or API key.

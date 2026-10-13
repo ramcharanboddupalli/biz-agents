@@ -36,6 +36,13 @@ from .research import (
     ResearchStatus,
 )
 from .report import BusinessReport, ReportAgent, ReportSourceReference, render_report
+from .manager import (
+    ManagerAgent,
+    StageStatus,
+    WorkflowResult,
+    WorkflowStage,
+    WorkflowStatus,
+)
 
 __all__ = [
     "AnalysisAgent",
@@ -54,6 +61,7 @@ __all__ = [
     "IntakeTurn",
     "LeadResearch",
     "LeadScore",
+    "ManagerAgent",
     "MarketEvidenceStatus",
     "MarketGap",
     "MarketResearch",
@@ -70,5 +78,9 @@ __all__ = [
     "ResearchResult",
     "ResearchSource",
     "ResearchStatus",
+    "StageStatus",
+    "WorkflowResult",
+    "WorkflowStage",
+    "WorkflowStatus",
     "render_report",
 ]

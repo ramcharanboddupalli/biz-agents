@@ -1,9 +1,9 @@
 # BizAgents – Multi-Agent Business Automation
 
-> **Current status: REPORT AGENT PHASE.** The text-based Intake Agent,
+> **Current status: MANAGER AGENT PHASE.** The text-based Intake Agent,
 > persistent ChromaDB business memory, source-aware Research Agent, and
-> deterministic Analysis and Report Agents are implemented. Later agents and
-> product functionality have not been implemented.
+> deterministic Analysis, Report, and Manager Agents are implemented. Later
+> agents and product functionality have not been implemented.
 
 ## What BizAgents is
 
@@ -44,8 +44,8 @@ The plan names the following agents and their intended responsibilities:
 3. Prepare relevant outreach and follow-up material.
 4. Present the results in a report.
 
-This is a high-level description only. The Intake, Research, Analysis, and
-Report Agents are implemented; other planned agent workflows are not yet
+This is a high-level description only. The Intake, Research, Analysis, Report,
+and Manager Agents are implemented; other planned agent workflows are not yet
 implemented.
 
 ## Planned technology stack
@@ -72,13 +72,13 @@ phase begins.
 
 ```text
 bizagents/
-├── agents/          # Intake, Research, Analysis, and Report Agents
+├── agents/          # Intake, Research, Analysis, Report, and Manager Agents
 ├── rag/             # Persistent ChromaDB business profile memory
 ├── voice/           # Planned speech components; currently empty
 ├── api/             # Planned backend API; currently empty
 ├── frontend/        # Planned frontend; currently empty
 ├── evals/           # Planned evaluation and monitoring; currently empty
-├── tests/           # Intake, RAG memory, Research, Analysis, and Report tests
+├── tests/           # Intake, RAG memory, Research, Analysis, Report, and Manager tests
 ├── data/chroma/     # Local ChromaDB storage (ignored by Git)
 ├── .env.example     # Placeholder names for future service configuration
 ├── requirements.txt # Python foundation and ChromaDB dependency
@@ -157,6 +157,16 @@ missing data, warnings, and research limitations are shown explicitly.
 Recommendations remain advisory; no actions are executed and budget fit is not
 assumed. The Report Agent uses no external services or additional dependencies.
 
+**Phase 7 — Manager Agent (implemented):** validate a `BusinessProfile`, then
+coordinate Research, Analysis, and Report in dependency order using their
+existing public interfaces. The typed workflow result preserves per-stage
+status, attempts, partial results, and limitations. Research retries are
+bounded and apply only to unexpected exceptions or explicit failed research
+results; validation and quality-check failures are not retried. Deterministic
+quality checks verify result shapes and source references before handoff.
+The Manager Agent does not perform outreach or other business actions and
+introduces no external services or dependencies.
+
 The uploaded **BizAgents Complete Project Plan** is the authoritative Master
 Plan. Development must follow its defined architecture and sequence:
 
@@ -164,9 +174,9 @@ Plan. Development must follow its defined architecture and sequence:
 2. Intake Agent
 3. RAG Memory
 4. Research Agent (implemented)
-5. Analysis Agent
-6. Report Agent
-7. Manager Agent
+5. Analysis Agent (implemented)
+6. Report Agent (implemented)
+7. Manager Agent (implemented)
 8. Arize Tracing
 9. Arize Evaluations
 10. Frontend

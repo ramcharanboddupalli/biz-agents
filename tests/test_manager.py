@@ -1,6 +1,9 @@
 import unittest
+from collections.abc import Generator
+from contextlib import contextmanager
 from dataclasses import replace
 from typing import cast
+from unittest.mock import patch
 
 from agents import (
     AnalysisResult,
@@ -25,7 +28,47 @@ from agents import (
     WorkflowResult,
     WorkflowStatus,
 )
+from agents.tracing import configured_tracer, traced_span
 from rag import BusinessProfile
+
+
+class FakeSpan:
+    def __init__(self, name: str, fail_on_attribute: bool = False) -> None:
+        self.name = name
+        self.attributes: dict[str, bool | float | int | str] = {}
+        self.fail_on_attribute = fail_on_attribute
+        self.finished = False
+
+    def set_attribute(self, key: str, value: bool | float | int | str) -> None:
+        if self.fail_on_attribute:
+            raise OSError("local fake exporter failure")
+        self.attributes[key] = value
+
+
+class FakeTracer:
+    def __init__(
+        self, fail_on_finish: bool = False, fail_on_attribute: bool = False
+    ) -> None:
+        self.spans: list[FakeSpan] = []
+        self.fail_on_finish = fail_on_finish
+        self.fail_on_attribute = fail_on_attribute
+        self.start_options: list[dict[str, bool]] = []
+
+    @contextmanager
+    def start_as_current_span(
+        self,
+        name: str,
+        **kwargs: bool,
+    ) -> Generator[FakeSpan, None, None]:
+        self.start_options.append(kwargs)
+        span = FakeSpan(name, fail_on_attribute=self.fail_on_attribute)
+        self.spans.append(span)
+        try:
+            yield span
+        finally:
+            span.finished = True
+            if self.fail_on_finish:
+                raise OSError("local fake exporter failure")
 
 
 class FakeResearchAgent:
@@ -493,6 +536,239 @@ class ManagerAgentTests(unittest.TestCase):
             ManagerAgent(FakeResearchAgent(self.research), research_retry_limit=-1)
         with self.assertRaisesRegex(ValueError, "non-negative integer"):
             ManagerAgent(FakeResearchAgent(self.research), research_retry_limit=True)
+
+    def test_tracing_disabled_without_credentials_preserves_workflow(self) -> None:
+        with patch.dict("os.environ", {}, clear=True):
+            with patch("phoenix.otel.register") as register:
+                result = ManagerAgent(
+                    FakeResearchAgent(self.research),
+                    FakeAnalysisAgent(self.analysis),
+                ).run(self.profile)
+
+        self.assertEqual(result.status, WorkflowStatus.SUCCESS)
+        register.assert_not_called()
+
+    def test_invalid_tracing_configuration_does_not_initialize_phoenix(self) -> None:
+        invalid_configuration = (
+            {"BIZAGENTS_TRACING_ENABLED": "sometimes"},
+            {"BIZAGENTS_TRACING_ENABLED": "true"},
+            {
+                "BIZAGENTS_TRACING_ENABLED": "true",
+                "PHOENIX_COLLECTOR_ENDPOINT": "https://user@collector.invalid",
+            },
+        )
+        for environment in invalid_configuration:
+            with self.subTest(environment=environment):
+                with patch.dict("os.environ", environment, clear=True):
+                    with patch("phoenix.otel.register") as register:
+                        self.assertIsNone(configured_tracer())
+                register.assert_not_called()
+
+    def test_phoenix_initialization_failure_does_not_change_workflow(self) -> None:
+        with patch.dict(
+            "os.environ",
+            {
+                "BIZAGENTS_TRACING_ENABLED": "true",
+                "PHOENIX_COLLECTOR_ENDPOINT": "http://localhost:6006/v1/traces",
+            },
+            clear=True,
+        ):
+            with patch("phoenix.otel.register", side_effect=OSError("secret endpoint")):
+                result = ManagerAgent(
+                    FakeResearchAgent(self.research),
+                    FakeAnalysisAgent(self.analysis),
+                ).run(self.profile)
+
+        self.assertEqual(result.status, WorkflowStatus.SUCCESS)
+        self.assertNotIn("secret endpoint", repr(result))
+
+    def test_attribute_export_failure_does_not_change_workflow(self) -> None:
+        result = ManagerAgent(
+            FakeResearchAgent(self.research),
+            FakeAnalysisAgent(self.analysis),
+            tracer=FakeTracer(fail_on_attribute=True),
+        ).run(self.profile)
+
+        self.assertEqual(result.status, WorkflowStatus.SUCCESS)
+
+    def test_phoenix_registration_uses_environment_and_disables_autoinstrumentation(
+        self,
+    ) -> None:
+        tracer = FakeTracer()
+        environment = {
+            "BIZAGENTS_TRACING_ENABLED": "true",
+            "PHOENIX_PROJECT_NAME": "local-project",
+            "PHOENIX_COLLECTOR_ENDPOINT": "http://localhost:6006/v1/traces",
+        }
+        with patch.dict("os.environ", environment, clear=True):
+            with patch("phoenix.otel.register") as register:
+                register.return_value.get_tracer.return_value = tracer
+                configured = configured_tracer()
+
+        self.assertIs(configured, tracer)
+        register.assert_called_once_with(
+            endpoint="http://localhost:6006/v1/traces",
+            project_name="local-project",
+            api_key=None,
+            batch=True,
+            auto_instrument=False,
+            verbose=False,
+        )
+
+    def test_successful_workflow_records_safe_workflow_and_stage_metadata(self) -> None:
+        tracer = FakeTracer()
+        result = ManagerAgent(
+            FakeResearchAgent(self.research),
+            FakeAnalysisAgent(self.analysis),
+            tracer=tracer,
+        ).run(self.profile)
+
+        self.assertEqual(result.status, WorkflowStatus.SUCCESS)
+        spans_by_name = {span.name: span for span in tracer.spans}
+        self.assertEqual(
+            set(spans_by_name),
+            {
+                "bizagents.workflow",
+                "bizagents.stage.validation",
+                "bizagents.stage.research",
+                "bizagents.stage.analysis",
+                "bizagents.stage.report",
+            },
+        )
+        self.assertEqual(
+            spans_by_name["bizagents.workflow"].attributes[
+                "bizagents.workflow.status"
+            ],
+            "success",
+        )
+        self.assertTrue(
+            all(
+                options
+                == {
+                    "record_exception": False,
+                    "set_status_on_exception": False,
+                }
+                for options in tracer.start_options
+            )
+        )
+        for stage_name in ("validation", "research", "analysis", "report"):
+            attributes = spans_by_name[f"bizagents.stage.{stage_name}"].attributes
+            self.assertEqual(attributes["bizagents.stage.status"], "completed")
+            self.assertIsInstance(attributes["bizagents.duration_ms"], float)
+        all_attributes = repr(
+            [span.attributes for span in tracer.spans]
+        )
+        self.assertNotIn(self.profile.business_profile_id, all_attributes)
+        self.assertNotIn(self.profile.offering, all_attributes)
+
+    def test_partial_and_failed_stage_outcomes_are_recorded(self) -> None:
+        partial = replace(self.research, status=ResearchStatus.PARTIAL)
+        partial_tracer = FakeTracer()
+        partial_result = ManagerAgent(
+            FakeResearchAgent(partial),
+            FakeAnalysisAgent(self.analysis),
+            tracer=partial_tracer,
+        ).run(self.profile)
+        research_span = next(
+            span
+            for span in partial_tracer.spans
+            if span.name == "bizagents.stage.research"
+        )
+        self.assertEqual(partial_result.status, WorkflowStatus.PARTIAL)
+        partial_workflow_span = next(
+            span for span in partial_tracer.spans if span.name == "bizagents.workflow"
+        )
+        self.assertEqual(
+            partial_workflow_span.attributes["bizagents.workflow.status"],
+            "partial",
+        )
+        self.assertEqual(research_span.attributes["bizagents.stage.status"], "partial")
+        self.assertEqual(
+            research_span.attributes["bizagents.stage.attempts"],
+            1,
+        )
+
+        failed_tracer = FakeTracer()
+        failed_result = ManagerAgent(
+            FakeResearchAgent(OSError("research offline")),
+            tracer=failed_tracer,
+        ).run(self.profile)
+        failed_research_span = next(
+            span
+            for span in failed_tracer.spans
+            if span.name == "bizagents.stage.research"
+        )
+        self.assertEqual(failed_result.status, WorkflowStatus.FAILED)
+        self.assertEqual(
+            failed_research_span.attributes["bizagents.stage.status"],
+            "failed",
+        )
+        self.assertTrue(failed_research_span.attributes["bizagents.error"])
+        self.assertEqual(
+            failed_research_span.attributes["bizagents.stage.attempts"],
+            2,
+        )
+        self.assertTrue(all(span.finished for span in failed_tracer.spans))
+        skipped_stages = {
+            span.name: span
+            for span in failed_tracer.spans
+            if ".stage." in span.name and span.name.rsplit(".", 1)[-1] in {"analysis", "report"}
+        }
+        self.assertEqual(
+            {
+                name: span.attributes["bizagents.stage.status"]
+                for name, span in skipped_stages.items()
+            },
+            {
+                "bizagents.stage.analysis": "skipped",
+                "bizagents.stage.report": "skipped",
+            },
+        )
+        self.assertTrue(all(span.finished for span in partial_tracer.spans))
+
+    def test_invalid_profile_traces_skipped_stages(self) -> None:
+        tracer = FakeTracer()
+        result = ManagerAgent(FakeResearchAgent(self.research), tracer=tracer).run(
+            cast(BusinessProfile, None)
+        )
+
+        self.assertEqual(result.status, WorkflowStatus.INVALID_INPUT)
+        spans_by_name = {span.name: span for span in tracer.spans}
+        for stage_name in ("research", "analysis", "report"):
+            span = spans_by_name[f"bizagents.stage.{stage_name}"]
+            self.assertEqual(span.attributes["bizagents.stage.status"], "skipped")
+            self.assertEqual(span.attributes["bizagents.stage.attempts"], 0)
+            self.assertTrue(span.finished)
+
+    def test_tracing_export_failure_does_not_change_business_failure(self) -> None:
+        failed_result = ManagerAgent(
+            FakeResearchAgent(OSError("research offline")),
+            tracer=FakeTracer(fail_on_finish=True),
+        ).run(self.profile)
+        successful_result = ManagerAgent(
+            FakeResearchAgent(self.research),
+            FakeAnalysisAgent(self.analysis),
+            tracer=FakeTracer(fail_on_finish=True),
+        ).run(self.profile)
+
+        self.assertEqual(failed_result.status, WorkflowStatus.FAILED)
+        self.assertEqual(
+            self._stage(failed_result, "research").status,
+            StageStatus.FAILED,
+        )
+        self.assertEqual(successful_result.status, WorkflowStatus.SUCCESS)
+
+    def test_finish_failure_does_not_mask_original_exception(self) -> None:
+        original_error = RuntimeError("sensitive original error")
+        tracer = FakeTracer(fail_on_finish=True)
+
+        with self.assertRaises(RuntimeError) as raised:
+            with traced_span(tracer, "bizagents.test"):
+                raise original_error
+
+        self.assertIs(raised.exception, original_error)
+        self.assertTrue(tracer.spans[0].finished)
+        self.assertNotIn("sensitive original error", repr(tracer.spans[0].attributes))
 
     @staticmethod
     def _stage(result: WorkflowResult, name: str):

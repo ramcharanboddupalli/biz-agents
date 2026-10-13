@@ -31,6 +31,7 @@ from .research import (
     ResearchSource,
     ResearchStatus,
 )
+from .tracing import SpanHandle, Tracer, configured_tracer, traced_span
 
 
 class StageStatus(str, Enum):
@@ -116,6 +117,7 @@ class ManagerAgent:
         report_agent: _ReportAgent | None = None,
         *,
         research_retry_limit: int = 1,
+        tracer: Tracer | None = None,
     ) -> None:
         if not callable(getattr(research_agent, "research", None)):
             raise TypeError("research_agent must implement research(profile).")
@@ -140,12 +142,43 @@ class ManagerAgent:
         self._analysis_agent = analysis_agent or AnalysisAgent()
         self._report_agent = report_agent or ReportAgent()
         self._research_retry_limit = research_retry_limit
+        self._tracer = tracer if tracer is not None else configured_tracer()
 
     def run(self, profile: BusinessProfile) -> WorkflowResult:
         """Run a workflow for one validated business profile."""
-        invalid_profile = self._profile_validation_error(profile)
+        with traced_span(self._tracer, "bizagents.workflow") as span:
+            result = self._run_workflow(profile)
+            span.set_attributes(
+                {
+                    "bizagents.workflow.status": result.status.value,
+                    "bizagents.workflow.stage_count": len(result.stages),
+                }
+            )
+            return result
+
+    def _run_workflow(self, profile: BusinessProfile) -> WorkflowResult:
+        with traced_span(self._tracer, "bizagents.stage.validation") as span:
+            invalid_profile = self._profile_validation_error(profile)
+            if invalid_profile is None:
+                span.set_attributes(
+                    {
+                        "bizagents.stage.status": StageStatus.COMPLETED.value,
+                        "bizagents.stage.attempts": 1,
+                    }
+                )
+            else:
+                span.set_attributes(
+                    {
+                        "bizagents.stage.status": StageStatus.FAILED.value,
+                        "bizagents.stage.attempts": 1,
+                        "bizagents.error": True,
+                        "error.type": "invalid_input",
+                    }
+                )
         if invalid_profile is not None:
             warning = f"Business profile validation failed: {invalid_profile}"
+            for stage_name in _STAGE_ORDER[1:]:
+                self._record_skipped_stage(stage_name)
             return WorkflowResult(
                 status=WorkflowStatus.INVALID_INPUT,
                 stages=(
@@ -163,7 +196,9 @@ class ManagerAgent:
                 warnings=(warning,),
             )
 
-        research_result, research_stage = self._run_research(profile)
+        with traced_span(self._tracer, "bizagents.stage.research") as span:
+            research_result, research_stage = self._run_research(profile)
+            self._record_stage(span, research_stage)
         stages = [
             WorkflowStage(
                 _VALIDATION_STAGE,
@@ -174,6 +209,8 @@ class ManagerAgent:
         ]
         warnings = list(research_stage.warnings)
         if research_result is None:
+            for stage_name in (_ANALYSIS_STAGE, _REPORT_STAGE):
+                self._record_skipped_stage(stage_name)
             stages.extend(
                 WorkflowStage(
                     name,
@@ -188,13 +225,19 @@ class ManagerAgent:
                 warnings=tuple(warnings),
             )
 
-        analysis_result, analysis_stage = self._run_analysis(profile, research_result)
+        with traced_span(self._tracer, "bizagents.stage.analysis") as span:
+            analysis_result, analysis_stage = self._run_analysis(
+                profile, research_result
+            )
+            self._record_stage(span, analysis_stage)
         stages.append(analysis_stage)
         warnings.extend(analysis_stage.warnings)
 
-        report, report_stage = self._run_report(
-            profile, research_result, analysis_result
-        )
+        with traced_span(self._tracer, "bizagents.stage.report") as span:
+            report, report_stage = self._run_report(
+                profile, research_result, analysis_result
+            )
+            self._record_stage(span, report_stage)
         stages.append(report_stage)
         warnings.extend(report_stage.warnings)
 
@@ -207,6 +250,27 @@ class ManagerAgent:
             report=report,
             warnings=tuple(dict.fromkeys(warnings)),
         )
+
+    @staticmethod
+    def _record_stage(span: SpanHandle, stage: WorkflowStage) -> None:
+        attributes = {
+            "bizagents.stage.status": stage.status.value,
+            "bizagents.stage.attempts": stage.attempts,
+            "bizagents.error": stage.status is StageStatus.FAILED,
+        }
+        if stage.status is StageStatus.FAILED:
+            attributes["error.type"] = "workflow_stage_failure"
+        span.set_attributes(attributes)
+
+    def _record_skipped_stage(self, stage_name: str) -> None:
+        with traced_span(self._tracer, f"bizagents.stage.{stage_name}") as span:
+            span.set_attributes(
+                {
+                    "bizagents.stage.status": StageStatus.SKIPPED.value,
+                    "bizagents.stage.attempts": 0,
+                    "bizagents.error": False,
+                }
+            )
 
     @staticmethod
     def _profile_validation_error(profile: object) -> str | None:

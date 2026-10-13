@@ -1,9 +1,10 @@
 # BizAgents – Multi-Agent Business Automation
 
-> **Current status: MANAGER AGENT PHASE.** The text-based Intake Agent,
+> **Current status: ARIZE TRACING PHASE.** The text-based Intake Agent,
 > persistent ChromaDB business memory, source-aware Research Agent, and
-> deterministic Analysis, Report, and Manager Agents are implemented. Later
-> agents and product functionality have not been implemented.
+> deterministic Analysis, Report, and Manager Agents are implemented. Manager
+> workflow tracing is implemented; later phases and product functionality are
+> not yet implemented.
 
 ## What BizAgents is
 
@@ -72,16 +73,16 @@ phase begins.
 
 ```text
 bizagents/
-├── agents/          # Intake, Research, Analysis, Report, and Manager Agents
+├── agents/          # Intake, Research, Analysis, Report, Manager, and tracing
 ├── rag/             # Persistent ChromaDB business profile memory
 ├── voice/           # Planned speech components; currently empty
 ├── api/             # Planned backend API; currently empty
 ├── frontend/        # Planned frontend; currently empty
 ├── evals/           # Planned evaluation and monitoring; currently empty
-├── tests/           # Intake, RAG memory, Research, Analysis, Report, and Manager tests
+├── tests/           # Agent, RAG memory, Manager, and tracing tests
 ├── data/chroma/     # Local ChromaDB storage (ignored by Git)
 ├── .env.example     # Placeholder names for future service configuration
-├── requirements.txt # Python foundation and ChromaDB dependency
+├── requirements.txt # Python foundation, ChromaDB, and Phoenix tracing
 └── README.md
 ```
 
@@ -96,8 +97,8 @@ target customers, location, budget, and goals through a text conversation.
 **Phase 3 — RAG Memory:** persist confirmed business profiles in
 ChromaDB and retrieve relevant profile fields semantically. Local persistent
 storage is used at `data/chroma/`; generated vector database files are ignored
-by Git. Future agents will consume this reusable memory interface. The
-Manager agent is not implemented. Queries without a
+by Git. Future agents will consume this reusable memory interface. The Manager
+Agent is implemented in Phase 7. Queries without a
 sufficiently relevant semantic match return no results.
 
 ```python
@@ -164,8 +165,25 @@ status, attempts, partial results, and limitations. Research retries are
 bounded and apply only to unexpected exceptions or explicit failed research
 results; validation and quality-check failures are not retried. Deterministic
 quality checks verify result shapes and source references before handoff.
-The Manager Agent does not perform outreach or other business actions and
-introduces no external services or dependencies.
+The Manager Agent does not perform outreach or other business actions.
+
+**Phase 8 — Arize Phoenix tracing (implemented):** optionally trace the
+Manager workflow and its validation, research, analysis, and report stages.
+Spans record stage outcomes, retry attempts, elapsed time, and safe error
+categories without exporting business profile contents, research data, or
+exception messages. Tracing is disabled by default and does not require a
+Phoenix account or network access in local development or tests.
+
+To enable tracing, install the dependencies in `requirements.txt` and set
+`BIZAGENTS_TRACING_ENABLED=true`. Set `PHOENIX_COLLECTOR_ENDPOINT` to a local
+Phoenix collector (the example value is `http://localhost:6006/v1/traces`) or
+your Phoenix Cloud collector endpoint. Set `PHOENIX_API_KEY` only when the
+selected endpoint requires it, and optionally set `PHOENIX_PROJECT_NAME`.
+Provide values through the process environment or have your launcher load a
+protected local environment file; BizAgents does not automatically load `.env`
+files. Never commit real credentials. Set `BIZAGENTS_TRACING_ENABLED=false` to
+disable tracing. Phoenix automatic instrumentation is intentionally off to
+avoid capturing unrelated or sensitive data.
 
 The uploaded **BizAgents Complete Project Plan** is the authoritative Master
 Plan. Development must follow its defined architecture and sequence:
@@ -177,7 +195,7 @@ Plan. Development must follow its defined architecture and sequence:
 5. Analysis Agent (implemented)
 6. Report Agent (implemented)
 7. Manager Agent (implemented)
-8. Arize Tracing
+8. Arize Tracing (implemented)
 9. Arize Evaluations
 10. Frontend
 11. Voice and multilingual support
@@ -204,9 +222,10 @@ Future implementation must not silently change this architecture or sequence.
 ## Foundation dependencies
 
 `requirements.txt` includes FastAPI, its ASGI server, settings/environment
-support, and ChromaDB for the implemented local RAG memory layer. Agent
-frameworks, LLM clients, database drivers, voice, search, company-data, email,
-and observability packages are deferred until their planned implementation
-phases. ChromaDB's built-in ONNX-backed `all-MiniLM-L6-v2` embedding function
-runs locally after its model files are downloaded on first use; it does not
-require a paid embedding API or API key.
+support, ChromaDB for the implemented local RAG memory layer, and
+`arize-phoenix-otel` for optional Phase 8 tracing. Agent frameworks, LLM
+clients, database drivers, voice, search, company-data, email, and evaluation
+packages remain deferred until their planned implementation phases.
+ChromaDB's built-in ONNX-backed `all-MiniLM-L6-v2` embedding function runs
+locally after its model files are downloaded on first use; it does not require
+a paid embedding API or API key.
